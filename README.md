@@ -1,3 +1,7 @@
+## Azure Storage
+
+Primary endpoint: https://stgsandfrontendeu024.z13.web.core.windows.net/
+
 # React-shop-cloudfront
 
 This is frontend starter project for nodejs-aws mentoring program. It uses the following technologies:
