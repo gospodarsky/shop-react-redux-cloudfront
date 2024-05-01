@@ -3,10 +3,11 @@ import { products } from '../mock';
 
 const httpTrigger: AzureFunction = async function (context: Context, req: HttpRequest): Promise<void> {
     context.log('HTTP trigger function processed a request.');
+    const productId = req.params.productId;
 
     context.res = {
         status: 200,
-        body: products
+        body: products.find(({ id }) => id === productId)
     };
 };
 
