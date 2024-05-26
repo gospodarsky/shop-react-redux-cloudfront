@@ -5,7 +5,7 @@
   "scripts": {
     "start": "vite",
     "build": "tsc && vite build",
-    "deploy": "az storage blob upload-batch -s './dist' -d '$web' --account-name 'stgsandfrontendeu024' --overwrite",
+    "deploy": "az storage blob upload-batch -s './dist' -d '$web' --account-name 'stgfrontendeastus' --overwrite",
     "preview": "npm run build && vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",

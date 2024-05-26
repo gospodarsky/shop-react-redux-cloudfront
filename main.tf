@@ -14,75 +14,79 @@ provider "azurerm" {
   features {}
 }
 
-resource "azurerm_resource_group" "front_end_rg" {
-  name     = "rg-frontend-sand-eu-001"
-  location = "eastus"
+variable "application" {
+  type    = string
+  default = "frontend"
 }
 
-resource "azurerm_storage_account" "front_end_storage_account" {
-  name                     = "stgsandfrontendeu024"
-  location                 = "eastus"
+variable "location" {
+  type    = string
+  default = "eastus"
+}
+
+locals {
+  resource_group_name = "rg-${var.application}-${var.location}"
+  storage_name = "stg${var.application}${var.location}"
+  storage_share_name = "stg-shr-${var.application}${var.location}"
+  service_plan_name = "sp-${var.application}-${var.location}"
+  function_app_name = "fa-${var.application}-${var.location}"
+  application_insights_name = "ai-${var.application}-${var.location}"
+}
+
+resource "azurerm_resource_group" "rg_workshop" {
+  name     = local.resource_group_name
+  location = var.location
+}
+
+resource "azurerm_storage_account" "stg_workshop" {
+  name     = local.storage_name
+  location = var.location
 
   account_replication_type = "LRS"
   account_tier             = "Standard"
   account_kind             = "StorageV2"
-  resource_group_name      = azurerm_resource_group.front_end_rg.name
+
+  resource_group_name = azurerm_resource_group.rg_workshop.name
 
   static_website {
     index_document = "index.html"
   }
 }
 
-resource "azurerm_resource_group" "product_service_rg" {
-  name     = "rg-product-service-sand-eu-001"
-  location = "eastus"
-}
-
-resource "azurerm_storage_account" "products_service_fa" {
-  name     = "stgsandproductsfaeu024"
-  location = "eastus"
-
-  account_replication_type = "LRS"
-  account_tier             = "Standard"
-  account_kind             = "StorageV2"
-
-  resource_group_name = azurerm_resource_group.product_service_rg.name
-}
-
-resource "azurerm_storage_share" "products_service_fa" {
-  name  = "fa-products-service-share"
+resource "azurerm_storage_share" "stg_shr_workshop" {
+  name  = local.storage_share_name
   quota = 2
 
-  storage_account_name = azurerm_storage_account.products_service_fa.name
+  storage_account_name = azurerm_storage_account.stg_workshop.name
 }
 
-resource "azurerm_service_plan" "product_service_plan" {
-  name     = "asp-product-service-sand-eu-001"
-  location = "eastus"
+resource "azurerm_service_plan" "sp_workshop" {
+  name     = local.service_plan_name
+  location = var.location
 
   os_type  = "Windows"
   sku_name = "Y1"
 
-  resource_group_name = azurerm_resource_group.product_service_rg.name
+  resource_group_name = azurerm_resource_group.rg_workshop.name
 }
 
-resource "azurerm_application_insights" "products_service_fa" {
-  name             = "appins-fa-products-service-sand-eu-001"
+resource "azurerm_application_insights" "ai_workshop" {
+  name             = local.application_insights_name
   application_type = "web"
-  location         = "eastus"
+  location         = var.location
 
-  resource_group_name = azurerm_resource_group.product_service_rg.name
+  resource_group_name = azurerm_resource_group.rg_workshop.name
 }
 
-resource "azurerm_windows_function_app" "products_service" {
-  name     = "fa-products-service-eu-001"
-  location = "eastus"
+resource "azurerm_windows_function_app" "fa_workshop" {
+  name     = local.function_app_name
+  location = var.location
 
-  service_plan_id     = azurerm_service_plan.product_service_plan.id
-  resource_group_name = azurerm_resource_group.product_service_rg.name
+  service_plan_id     = azurerm_service_plan.sp_workshop.id
+  resource_group_name = azurerm_resource_group.rg_workshop.name
 
-  storage_account_name       = azurerm_storage_account.products_service_fa.name
-  storage_account_access_key = azurerm_storage_account.products_service_fa.primary_access_key
+  storage_account_name       = azurerm_storage_account.stg_workshop.name
+  storage_account_access_key = azurerm_storage_account.stg_workshop.primary_access_key
 
   functions_extension_version = "~4"
   builtin_logging_enabled     = false
@@ -90,8 +94,8 @@ resource "azurerm_windows_function_app" "products_service" {
   site_config {
     always_on = false
 
-    application_insights_key               = azurerm_application_insights.products_service_fa.instrumentation_key
-    application_insights_connection_string = azurerm_application_insights.products_service_fa.connection_string
+    application_insights_key               = azurerm_application_insights.ai_workshop.instrumentation_key
+    application_insights_connection_string = azurerm_application_insights.ai_workshop.connection_string
 
     # For production systems set this to false, but consumption plan supports only 32bit workers
     use_32_bit_worker = true
@@ -107,8 +111,8 @@ resource "azurerm_windows_function_app" "products_service" {
   }
 
   app_settings = {
-    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING = azurerm_storage_account.products_service_fa.primary_connection_string
-    WEBSITE_CONTENTSHARE                     = azurerm_storage_share.products_service_fa.name
+    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING = azurerm_storage_account.stg_workshop.primary_connection_string
+    WEBSITE_CONTENTSHARE                     = azurerm_storage_share.stg_shr_workshop.name
   }
 
   # The app settings changes cause downtime on the Function App. e.g. with Azure Function App Slots
