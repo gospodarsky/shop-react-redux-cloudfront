@@ -31,6 +31,9 @@ locals {
   service_plan_name = "sp-${var.application}-${var.location}"
   function_app_name = "fa-${var.application}-${var.location}"
   application_insights_name = "ai-${var.application}-${var.location}"
+  api_management = "apim-${var.application}-${var.location}"
+  api_management_api = "products-service-api"
+  api_management_backend = "products-service-backend"
 }
 
 resource "azurerm_resource_group" "rg_workshop" {
@@ -125,5 +128,108 @@ resource "azurerm_windows_function_app" "fa_workshop" {
       tags["hidden-link: /app-insights-resource-id"],
       tags["hidden-link: /app-insights-conn-string"]
     ]
+  }
+}
+
+resource "azurerm_api_management" "apim_workshop" {
+  name                = local.api_management
+  location            = azurerm_resource_group.rg_workshop.location
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+
+  publisher_name      = "Artyom Gospodarsky"
+  publisher_email     = "azure@gospodarsky.simplelogin.com"
+
+  sku_name = "Consumption_0"
+}
+
+resource "azurerm_api_management_api" "apim_api_workshop" {
+  name                = local.api_management_api
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  api_management_name = azurerm_api_management.apim_workshop.name
+  revision            = "1"
+  display_name = "Products Service API"
+  protocols = ["https"]
+  subscription_required = false
+}
+
+data "azurerm_function_app_host_keys" "products_keys" {
+  name = azurerm_windows_function_app.fa_workshop.name
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+}
+
+resource "azurerm_api_management_backend" "apim_backend_workshop" {
+  name = local.api_management_backend
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  api_management_name = azurerm_api_management.apim_workshop.name
+  protocol = "http"
+  url = "https://${azurerm_windows_function_app.fa_workshop.name}.azurewebsites.net/api"
+  description = "Products API"
+
+  credentials {
+    certificate = []
+    query = {}
+
+    header = {
+      "x-functions-key" = data.azurerm_function_app_host_keys.products_keys.default_function_key
+    }
+  }
+}
+
+resource "azurerm_api_management_api_policy" "api_policy" {
+  api_management_name = azurerm_api_management.apim_workshop.name
+  api_name            = azurerm_api_management_api.apim_api_workshop.name
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+
+  xml_content = <<XML
+ <policies>
+    <inbound>
+        <set-backend-service backend-id="${azurerm_api_management_backend.apim_backend_workshop.name}"/>
+        <cors allow-credentials="false">
+            <allowed-origins>
+                <origin>*</origin>
+            </allowed-origins>
+            <allowed-methods>
+                <method>GET</method>
+                <method>POST</method>
+            </allowed-methods>
+        </cors>
+        <base/>
+    </inbound>
+    <backend>
+        <base/>
+    </backend>
+    <outbound>
+        <base/>yes
+    </outbound>
+    <on-error>
+        <base/>
+    </on-error>
+ </policies>
+XML
+}
+
+resource "azurerm_api_management_api_operation" "get_products" {
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  api_management_name = azurerm_api_management.apim_workshop.name
+  api_name            = azurerm_api_management_api.apim_api_workshop.name
+  display_name        = "Get Products"
+  method              = "GET"
+  operation_id        = "get-products"
+  url_template        = "/products"
+}
+
+resource "azurerm_api_management_api_operation" "get_product_by_id" {
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  api_management_name = azurerm_api_management.apim_workshop.name
+  api_name            = azurerm_api_management_api.apim_api_workshop.name
+  display_name        = "Get Product by ID"
+  method              = "GET"
+  operation_id        = "get-product-by-id"
+  url_template        = "/products/{productId}"
+
+  template_parameter {
+    name     = "productId"
+    type     = "number"
+    required = true
   }
 }
