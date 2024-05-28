@@ -233,3 +233,13 @@ resource "azurerm_api_management_api_operation" "get_product_by_id" {
     required = true
   }
 }
+
+resource "azurerm_api_management_api_operation" "create_product" {
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  api_management_name = azurerm_api_management.apim_workshop.name
+  api_name            = azurerm_api_management_api.apim_api_workshop.name
+  display_name        = "Create Product"
+  method              = "POST"
+  operation_id        = "create"
+  url_template        = "/product"
+}
