@@ -191,6 +191,7 @@ resource "azurerm_api_management_api_policy" "api_policy" {
             <allowed-methods>
                 <method>GET</method>
                 <method>POST</method>
+                <method>PUT</method>
             </allowed-methods>
         </cors>
         <base/>
