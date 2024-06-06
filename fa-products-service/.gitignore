@@ -49,3 +49,4 @@ __azurite_db*__.json
 
 faker.ts
 products.json
+stocks.json

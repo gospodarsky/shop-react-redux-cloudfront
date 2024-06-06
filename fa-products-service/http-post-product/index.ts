@@ -1,20 +1,24 @@
 import { AzureFunction, Context, HttpRequest } from '@azure/functions';
-import { productContainer } from '../cosmo-db';
+import { productContainer, stocksContainer } from '../cosmo-db';
 import { faker } from "@faker-js/faker";
+import { Product, Stock } from '../models';
+import { ItemResponse } from '@azure/cosmos';
 
 const httpTrigger: AzureFunction = async function (
   context: Context,
   req: HttpRequest,
 ): Promise<void> {
-  const { ...newProduct } = req.body;
-  console.log({ newProduct });
+  const { count, ...newProduct} = req.body;
   try {
-    const { resource: createdProduct } = await productContainer.items.create({ id: faker.string.uuid(), ...newProduct });
-    console.log({ createdProduct });
+    const productResponse: ItemResponse<Product> = await productContainer.items.create({ id: faker.string.uuid(), ...newProduct });
+    const { resource: product } = productResponse;
+    const stockResponse: ItemResponse<Stock> = await stocksContainer.items.create({ product_id: product.id, count: count ?? 0 });
+    const { resource: stock } = stockResponse;
     context.res = {
       status: 201,
       body: {
-        ...createdProduct
+        ...product,
+        count: stock.count
       },
       headers: {
         'Content-Type': 'application/json',

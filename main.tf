@@ -34,6 +34,7 @@ locals {
   api_management = "apim-${var.application}-${var.location}"
   api_management_api = "products-service-api"
   api_management_backend = "products-service-backend"
+  db_name = "db-${var.application}-${var.location}"
 }
 
 resource "azurerm_resource_group" "rg_workshop" {
@@ -219,6 +220,16 @@ resource "azurerm_api_management_api_operation" "get_products" {
   url_template        = "/products"
 }
 
+resource "azurerm_api_management_api_operation" "create_product" {
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  api_management_name = azurerm_api_management.apim_workshop.name
+  api_name            = azurerm_api_management_api.apim_api_workshop.name
+  display_name        = "Create Product"
+  method              = "POST"
+  operation_id        = "create-product"
+  url_template        = "/products"
+}
+
 resource "azurerm_api_management_api_operation" "get_product_by_id" {
   resource_group_name = azurerm_resource_group.rg_workshop.name
   api_management_name = azurerm_api_management.apim_workshop.name
@@ -235,12 +246,63 @@ resource "azurerm_api_management_api_operation" "get_product_by_id" {
   }
 }
 
-resource "azurerm_api_management_api_operation" "create_product" {
+resource "azurerm_cosmosdb_account" "db_workshop" {
   resource_group_name = azurerm_resource_group.rg_workshop.name
-  api_management_name = azurerm_api_management.apim_workshop.name
-  api_name            = azurerm_api_management_api.apim_api_workshop.name
-  display_name        = "Create Product"
-  method              = "POST"
-  operation_id        = "create"
-  url_template        = "/product"
+  location            = azurerm_resource_group.rg_workshop.location
+  name                = local.db_name
+  offer_type          = "Standard"
+  kind                = "GlobalDocumentDB"
+
+  consistency_policy {
+    consistency_level = "Eventual"
+  }
+
+  capabilities {
+    name = "EnableServerless"
+  }
+
+  geo_location {
+    failover_priority = 0
+    location          = azurerm_resource_group.rg_workshop.location
+  }
+}
+
+resource "azurerm_cosmosdb_sql_database" "products" {
+  account_name        = azurerm_cosmosdb_account.db_workshop.name
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  name                = "products-db"
+}
+
+resource "azurerm_cosmosdb_sql_container" "products_container" {
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  account_name        = azurerm_cosmosdb_account.db_workshop.name
+  database_name       = azurerm_cosmosdb_sql_database.products.name
+  name                = "products"
+  partition_key_path  = "/id"
+
+  # Cosmos DB supports TTL for the records
+  default_ttl = -1
+
+  indexing_policy {
+    excluded_path {
+      path = "/*"
+    }
+  }
+}
+
+resource "azurerm_cosmosdb_sql_container" "stocks_container" {
+  resource_group_name = azurerm_resource_group.rg_workshop.name
+  account_name        = azurerm_cosmosdb_account.db_workshop.name
+  database_name       = azurerm_cosmosdb_sql_database.products.name
+  name                = "stocks"
+  partition_key_path  = "/product_id"
+
+  # Cosmos DB supports TTL for the records
+  default_ttl = -1
+
+  indexing_policy {
+    excluded_path {
+      path = "/*"
+    }
+  }
 }
