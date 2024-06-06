@@ -1,6 +1,6 @@
 ## Azure Storage
 
-Primary endpoint: https://stgsandfrontendeu024.z13.web.core.windows.net/
+Primary endpoint: https://stgfrontendeastus.z13.web.core.windows.net/
 
 # React-shop-cloudfront
 
