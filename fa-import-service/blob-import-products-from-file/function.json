@@ -1,0 +1,13 @@
+{
+  "bindings": [
+    {
+      "authLevel": "function",
+      "name": "blob",
+      "type": "blobTrigger",
+      "direction": "in",
+      "path": "uploaded",
+      "connection": "AZURE_STORAGE_CONNECTION_STRING"
+    }
+  ],
+  "scriptFile": "../dist/blob-import-products-from-file/index.js"
+}
