@@ -306,3 +306,83 @@ resource "azurerm_cosmosdb_sql_container" "stocks_container" {
     }
   }
 }
+
+/* Docs: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group */
+resource "azurerm_resource_group" "rg_storage" {
+  name     = "rg-storage"
+  location = "East US"
+}
+
+/* Docs: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account */
+resource "azurerm_storage_account" "storage_account" {
+  name                             = "importservicestorage"
+  resource_group_name              = azurerm_resource_group.rg_storage.name
+  location                         = azurerm_resource_group.rg_storage.location
+  account_tier                     = "Standard"
+  account_replication_type         = "LRS" /*  GRS, RAGRS, ZRS, GZRS, RAGZRS */
+  access_tier                      = "Cool"
+  enable_https_traffic_only        = true
+  allow_nested_items_to_be_public  = true
+  shared_access_key_enabled        = true
+  public_network_access_enabled    = true
+
+  /* edge_zone = "North Europe" */
+}
+
+/* Docs: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_container */
+resource "azurerm_storage_container" "storage_container" {
+  name                  = "container"
+  storage_account_name  = azurerm_storage_account.storage_account.name
+  container_access_type = "private"
+}
+
+/* Docs: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_blob */
+resource "azurerm_storage_blob" "storage_blob" {
+  name                   = "import-blob"
+  storage_account_name   = azurerm_storage_account.storage_account.name
+  storage_container_name = azurerm_storage_container.storage_container.name
+  type                   = "Block"
+  access_tier            = "Cool"
+}
+
+resource "azurerm_windows_function_app" "fa_storage" {
+  name     = "fa-import-service"
+  location = azurerm_resource_group.rg_storage.location
+
+  service_plan_id     = azurerm_service_plan.sp_workshop.id
+  resource_group_name = azurerm_resource_group.rg_storage.name
+
+  storage_account_name       = azurerm_storage_account.storage_account.name
+  storage_account_access_key = azurerm_storage_account.storage_account.primary_access_key
+
+  functions_extension_version = "~4"
+  builtin_logging_enabled     = false
+
+  site_config {
+    always_on = false
+
+    # For production systems set this to false, but consumption plan supports only 32bit workers
+    use_32_bit_worker = true
+
+    # Enable function invocations from Azure Portal.
+    cors {
+      allowed_origins = ["https://portal.azure.com"]
+    }
+
+    application_stack {
+      node_version = "~16"
+    }
+  }
+
+  # The app settings changes cause downtime on the Function App. e.g. with Azure Function App Slots
+  # Therefore it is better to ignore those changes and manage app settings separately off the Terraform.
+  lifecycle {
+    ignore_changes = [
+      app_settings,
+      site_config["application_stack"], // workaround for a bug when azure just "kills" your app
+      tags["hidden-link: /app-insights-instrumentation-key"],
+      tags["hidden-link: /app-insights-resource-id"],
+      tags["hidden-link: /app-insights-conn-string"]
+    ]
+  }
+}
